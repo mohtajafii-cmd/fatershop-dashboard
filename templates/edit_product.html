@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>ویرایش کالا: {{ product.Name }}</h3>
+        <a href="{{ url_for('products.products_list_page') }}" class="btn btn-outline-secondary">بازگشت به لیست</a>
+    </div>
+
+    <form id="productForm">
+        <input type="hidden" name="ErpCode" value="{{ product.ErpCode }}">
+        <input type="hidden" id="initialData" value='{{ product | tojson }}'>
+
+        <div class="row g-4">
+            <!-- اطلاعات پایه -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">اطلاعات پایه</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">کد کالا</label>
+                            <input type="text" name="Code" class="form-control form-control-sm" value="{{ product.Code }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">نام کالا</label>
+                            <input type="text" name="Name" class="form-control form-control-sm" value="{{ product.Name }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">مدل</label>
+                            <input type="text" name="Model" class="form-control form-control-sm" value="{{ product.Model or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">گروه اصلی</label>
+                            <select name="MainGroupErpCode" class="form-select form-select-sm" id="mainGroupSelect" disabled>
+                                <option value="{{ product.MainGroupErpCode }}">{{ product.MainGroupName_Display }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">گروه فرعی</label>
+                            <select name="SideGroupErpCode" class="form-select form-select-sm" id="sideGroupSelect" disabled>
+                                <option value="{{ product.SideGroupErpCode }}">{{ product.SideGroupName_Display }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">واحد</label>
+                            <select name="UnitErpCode" class="form-select form-select-sm" id="unitSelect">
+                                <option value="">در حال بارگذاری...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- موجودی (فقط خواندنی) -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">موجودی (فقط خواندنی)</div>
+                    <div class="card-body">
+                        {% set stock_fields = ['Few','FewKarton','CountInKarton','CountInBasteh','MinFew','MaxFew'] %}
+                        {% for key in stock_fields %}
+                        <div class="mb-2">
+                            <label class="form-label small">{{ FIELD_LABELS.get(key, key) }}</label>
+                            <input type="number" step="any" name="{{ key }}" class="form-control form-control-sm" value="{{ product[key] }}" disabled>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- قیمت‌گذاری -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-dark">قیمت‌گذاری</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label small">قیمت خرید</label>
+                            <input type="number" step="any" name="BuyPrice" class="form-control form-control-sm" value="{{ product.BuyPrice }}" disabled>
+                        </div>
+                        {% set price_fields = ['SellPrice','SellPrice2','SellPrice3','DiscountPrice','DiscountPercent'] %}
+                        {% for key in price_fields %}
+                        <div class="mb-2">
+                            <label class="form-label small">{{ FIELD_LABELS.get(key, key) }}</label>
+                            <input type="number" step="any" name="{{ key }}" class="form-control form-control-sm" value="{{ product.get(key, 0) }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mt-2">
+            <!-- مشخصات فنی -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">مشخصات فنی</div>
+                    <div class="card-body">
+                        {% set other_fields = ['Other1','Other2','Other3','Other4','Other5','Other6','Other7','Other8','Other9','Other10','A_Country','Place'] %}
+                        {% for key in other_fields %}
+                        <div class="mb-2">
+                            <label class="form-label small">{{ FIELD_LABELS.get(key, key) }}</label>
+                            <input type="text" name="{{ key }}" class="form-control form-control-sm" value="{{ product.get(key, '') }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ویژگی‌ها -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">ویژگی‌های تخصیص یافته</div>
+                    <div class="card-body">
+                        {% if product.PoshakDetails %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead><tr><th>نام</th><th>موجودی</th><th>Min</th><th>Max</th></tr></thead>
+                                <tbody>
+                                    {% for item in product.PoshakDetails %}
+                                    <tr>
+                                        <td>{{ item.Name }}</td>
+                                        <td>{{ format_number(item.Few) }}</td>
+                                        <td>{{ format_number(item.Min) }}</td>
+                                        <td>{{ format_number(item.Max) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted text-center my-4">ویژگی خاصی تعریف نشده است.</p>
+                        {% endif %}
+
+                        {% if product.morecodes %}
+                        <hr>
+                        <h6>بارکدهای اضافی:</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for bc in product.morecodes %}
+                            <span class="badge bg-light text-dark border">{{ bc }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 text-end border-top pt-3">
+            <button type="button" class="btn btn-success btn-lg px-5" onclick="saveChanges()">ثبت تغییرات در هلو</button>
+            <a href="{{ url_for('products.products_list_page') }}" class="btn btn-outline-secondary btn-lg">انصراف</a>
+        </div>
+    </form>
+</div>
+
+<script>
+let originalValues = {};
+document.addEventListener('DOMContentLoaded', function() {
+    const el = document.getElementById('initialData');
+    if (el) originalValues = JSON.parse(el.value);
+    loadDropdowns();
+});
+
+function loadDropdowns() {
+    fetch('/api/meta/units').then(r=>r.json()).then(data=>{
+        const s = document.getElementById('unitSelect'); s.innerHTML='';
+        data.forEach(u=>{const o=document.createElement('option');o.value=u.ErpCode;o.text=u.Name;if(u.ErpCode===originalValues.UnitErpCode)o.selected=true;s.appendChild(o);});
+    });
+    fetch('/api/meta/main-groups').then(r=>r.json()).then(data=>{
+        const s=document.getElementById('mainGroupSelect');let found=false;
+        data.forEach(g=>{const o=document.createElement('option');o.value=g.ErpCode;o.text=g.Name;if(g.ErpCode===originalValues.MainGroupErpCode){o.selected=true;found=true;}s.appendChild(o);});
+        if(!found&&originalValues.MainGroupErpCode){const o=document.createElement('option');o.value=originalValues.MainGroupErpCode;o.text=originalValues.MainGroupName_Display||originalValues.MainGroupErpCode;o.selected=true;s.prepend(o);}
+    });
+    fetch(`/api/meta/side-groups?main_erp=${originalValues.MainGroupErpCode}`).then(r=>r.json()).then(data=>{
+        const s=document.getElementById('sideGroupSelect');let found=false;
+        data.forEach(g=>{const o=document.createElement('option');o.value=g.ErpCode;o.text=g.Name;if(g.ErpCode===originalValues.SideGroupErpCode){o.selected=true;found=true;}s.appendChild(o);});
+        if(!found&&originalValues.SideGroupErpCode){const o=document.createElement('option');o.value=originalValues.SideGroupErpCode;o.text=originalValues.SideGroupName_Display||originalValues.SideGroupErpCode;o.selected=true;s.prepend(o);}
+    });
+}
+
+function saveChanges() {
+    const form = document.getElementById('productForm');
+    const newData = Object.fromEntries(new FormData(form).entries());
+    const changedData = { ErpCode: newData['ErpCode'] };
+    const allowed = ['Code','Name','Model','UnitErpCode','SellPrice','SellPrice2','SellPrice3','SellPrice4','SellPrice5','SellPrice6','SellPrice7','SellPrice8','SellPrice9','SellPrice10','DiscountPrice','DiscountPercent','Other1','Other2','Other3','Other4','Other5','Other6','Other7','Other8','Other9','Other10','A_Country','Place'];
+    for (const key of allowed) {
+        if (String(newData[key]) !== String(originalValues[key]) && newData[key] !== null && newData[key] !== undefined && newData[key] !== "") {
+            changedData[key] = key.startsWith('Sell') || key.startsWith('Discount') ? parseFloat(newData[key]) : newData[key];
+        }
+    }
+    if (Object.keys(changedData).length <= 1) { alert("هیچ تغییری اعمال نشده است."); return; }
+    const btn = document.querySelector('.btn-success'); const orig = btn.innerText;
+    btn.disabled = true; btn.innerText = 'در حال ارتباط با هلو...';
+    fetch('/update-product', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(changedData) })
+    .then(r=>r.json()).then(result=>{
+        btn.disabled=false; btn.innerText=orig; alert(result.message);
+        if(result.status==='success') window.location.href="{{ url_for('products.products_list_page') }}";
+    }).catch(()=>{ btn.disabled=false; btn.innerText=orig; alert('خطا در ارتباط با سرور'); });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>ثبت فاکتور خرید</h3>
+        <button class="btn btn-outline-secondary btn-sm" onclick="resetInvoicePage()">شروع مجدد</button>
+    </div>
+
+    <!-- بخش بالایی: تامین‌کننده و تاریخ -->
+    <div class="row g-3 align-items-end mb-4">
+        <div class="col-md-4">
+            <label class="form-label">جستجوی تامین‌کننده <span class="text-danger">*</span></label>
+            <div class="position-relative">
+                <input type="text" id="supplierSearch" class="form-control"
+                       placeholder="نام یا کد تامین‌کننده..." autocomplete="off">
+                <div id="supplierSearchResults" class="list-group position-absolute w-100 shadow-sm"
+                     style="display:none; max-height: 300px; overflow-y: auto; z-index: 1000; background: white; border: 1px solid var(--border-color); border-radius: 8px;">
+                </div>
+            </div>
+            <input type="hidden" id="selectedSupplierErp" value="">
+            <small class="text-muted mt-1 d-block" id="selectedSupplierDisplay">هیچ تامین‌کننده‌ای انتخاب نشده است</small>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">تاریخ فاکتور <span class="text-danger">*</span></label>
+            <input type="text" id="invoiceDate" class="form-control" placeholder="۱۴۰۴/۰۲/۱۵">
+            <small class="text-muted">شمسی یا میلادی</small>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">ساعت</label>
+            <input type="time" id="invoiceTime" class="form-control">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">شماره فاکتور</label>
+            <input type="text" id="invoiceNumber" class="form-control bg-light fw-bold text-primary" 
+                   value="خودکار" readonly>
+        </div>
+        <div class="col-md-2"></div>
+    </div>
+
+    <!-- بخش جستجوی کالا -->
+    <div class="row g-2 mb-4 align-items-end">
+        <div class="col-md-5 position-relative">
+            <label class="form-label">جستجوی کالا (بارکد / نام)</label>
+            <div class="input-group input-group-lg">
+                <input type="text" id="productSearch" class="form-control" 
+                       placeholder="اسکن بارکد یا تایپ نام..." autofocus>
+                <button class="btn btn-primary" type="button" onclick="searchProduct()">جستجو</button>
+            </div>
+            <div id="productSuggestions" class="list-group position-absolute w-100 shadow-sm"
+                 style="display:none; z-index:1000; max-height:300px; overflow-y:auto; background:white; border:1px solid var(--border-color); border-radius:8px;">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">تعداد</label>
+            <input type="number" id="quantityInput" class="form-control form-control-lg text-center" value="1" min="1">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">قیمت خرید (ریال) <span class="text-danger">*</span></label>
+            <input type="number" id="priceInput" class="form-control form-control-lg" 
+                   placeholder="قیمت واحد..." min="0" step="100">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-success btn-lg w-100" onclick="addProductToInvoice()">افزودن</button>
+        </div>
+    </div>
+
+    <!-- جدول اقلام فاکتور -->
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered table-hover align-middle" id="invoiceItemsTable">
+            <thead class="table-light">
+                <tr>
+                    <th width="5%">#</th>
+                    <th width="12%">بارکد</th>
+                    <th>نام کالا</th>
+                    <th width="10%">تعداد</th>
+                    <th width="12%" class="text-end">قیمت خرید</th>
+                    <th width="12%" class="text-end">جمع کل</th>
+                    <th width="6%" class="text-center">حذف</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceItemsBody"></tbody>
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <td colspan="5" class="text-end">جمع کل:</td>
+                    <td class="text-end" id="totalAmount">0</td>
+                    <td></td>
+                </tr>
+                <tr class="table-success">
+                    <td colspan="5" class="text-end fs-5">مبلغ قابل پرداخت:</td>
+                    <td class="text-end fs-5" id="netPayable">0</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- بخش هزینه‌ها و درآمدها -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">هزینه‌های جانبی فاکتور</div>
+                <div class="card-body">
+                    <div id="costItemsContainer">
+                        <div class="row g-2 cost-item mb-2 align-items-center">
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm cost-sarfasl">
+                                    <option value="">انتخاب سرفصل هزینه...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" class="form-control form-control-sm cost-amount" 
+                                       placeholder="مبلغ" min="0">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-outline-danger w-100 remove-cost-item" type="button">×</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addCostItem()">+ افزودن هزینه</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">درآمدهای جانبی فاکتور</div>
+                <div class="card-body">
+                    <div id="incomeItemsContainer">
+                        <div class="row g-2 income-item mb-2 align-items-center">
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm income-sarfasl">
+                                    <option value="">انتخاب سرفصل درآمد...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" class="form-control form-control-sm income-amount" 
+                                       placeholder="مبلغ" min="0">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-outline-danger w-100 remove-income-item" type="button">×</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addIncomeItem()">+ افزودن درآمد</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- بخش پرداخت و توضیحات -->
+    <div class="row g-3 mb-4 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">روش پرداخت</label>
+            <select id="paymentMethod" class="form-select" onchange="togglePaymentFields()">
+                <option value="cash">نقدی (صندوق)</option>
+                <option value="bank">کارتخوان / بانکی</option>
+                <option value="cheque">چک</option>
+                <option value="nesiyeh">نسیه</option>
+            </select>
+        </div>
+        <div class="col-md-3" id="cashSection">
+            <label class="form-label">سرفصل صندوق <span class="text-danger">*</span></label>
+            <select id="cashSarfasl" class="form-select">
+                <option value="">در حال بارگذاری...</option>
+            </select>
+        </div>
+        <div class="col-md-3" id="bankSelection" style="display:none;">
+            <label class="form-label">حساب بانکی / کارتخوان</label>
+            <select id="bankAccount" class="form-select">
+                <option value="">انتخاب کنید...</option>
+            </select>
+        </div>
+        <div class="col-md-3" id="chequeDetails" style="display:none;">
+            <label class="form-label">شماره چک</label>
+            <input type="text" id="chequeNumber" class="form-control" placeholder="شماره چک">
+            <div class="row g-2 mt-1">
+                <div class="col-6"><input type="date" id="chequeDate" class="form-control form-control-sm"></div>
+                <div class="col-6">
+                    <select id="chequeBank" class="form-select form-select-sm">
+                        <option value="">بانک...</option>
+                    </select>
+                </div>
+            </div>
+            <input type="text" id="chequeAccount" class="form-control form-control-sm mt-1" placeholder="شماره حساب">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">توضیحات فاکتور</label>
+            <textarea id="invoiceComment" class="form-control" rows="2" placeholder="توضیحات اختیاری..."></textarea>
+        </div>
+    </div>
+
+    <!-- دکمه ثبت نهایی -->
+    <div class="text-end border-top pt-3">
+        <button class="btn btn-danger btn-lg px-5 fw-bold" onclick="registerPurchaseInvoice()" id="registerBtn">
+            ثبت فاکتور خرید
+        </button>
+    </div>
+</div>
+
+<script>
+let invoiceItems = [];
+let rowCounter = 0;
+let selectedProduct = null;
+let selectedSupplier = null;
+let supplierSearchTimeout = null;
+let productSearchTimeout = null;
+
+// =============================================
+// تنظیمات اولیه
+// =============================================
+$(document).ready(function() {
+    loadBankAccounts();
+    loadCostAndIncomeHeaders();
+    loadDefaultSupplier();
+    loadCashHeaders();
+    updatePaymentSummary();
+
+    function setCurrentTime() {
+        const now = new Date();
+        document.getElementById('invoiceTime').value = 
+            String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    }
+    setCurrentTime();
+    setInterval(setCurrentTime, 30000);
+
+    // جستجوی تامین‌کننده
+    $('#supplierSearch').on('input', function() {
+        const query = $(this).val().trim();
+        if (supplierSearchTimeout) clearTimeout(supplierSearchTimeout);
+        if (query.length < 1) { $('#supplierSearchResults').hide(); return; }
+        supplierSearchTimeout = setTimeout(() => searchSuppliers(query), 300);
+    });
+
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#supplierSearch').length && !$(e.target).closest('#supplierSearchResults').length)
+            $('#supplierSearchResults').hide();
+        if (!$(e.target).closest('#productSearch').length && !$(e.target).closest('#productSuggestions').length)
+            $('#productSuggestions').hide();
+    });
+
+    $('#supplierSearch').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const first = $('#supplierSearchResults .list-group-item:first');
+            if (first.length) first.click();
+        }
+    });
+
+    // جستجوی کالا
+    $('#productSearch').on('input', function() {
+        const query = $(this).val().trim();
+        if (productSearchTimeout) clearTimeout(productSearchTimeout);
+        if (query.length < 2) { $('#productSuggestions').hide(); return; }
+        productSearchTimeout = setTimeout(() => searchProductsLive(query), 300);
+    });
+
+    document.getElementById('productSearch').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = this.value.trim();
+            if (!query) return;
+            if (selectedProduct && selectedProduct.Name === query) {
+                document.getElementById('quantityInput').value = 1;
+                addProductToInvoice();
+                return;
+            }
+            searchProductsLive(query);
+        }
+    });
+
+    document.getElementById('quantityInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && selectedProduct) { e.preventDefault(); addProductToInvoice(); }
+    });
+    document.getElementById('priceInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && selectedProduct) { e.preventDefault(); addProductToInvoice(); }
+    });
+});
+
+// =============================================
+// توابع کمکی
+// =============================================
+function formatNumber(num) {
+    if (num === undefined || num === null || isNaN(num)) return '0';
+    return Number(num).toLocaleString('fa-IR');
+}
+function playSuccessBeep() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880; osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.12);
+    } catch(e) {}
+}
+function playErrorBeep() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 440; osc.type = 'square';
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
+}
+
+// =============================================
+// بارگذاری سرفصل‌ها
+// =============================================
+function loadCashHeaders() {
+    $.get('/api/meta/cash-headers/db', function(data) {
+        const select = document.getElementById('cashSarfasl');
+        select.innerHTML = '<option value="">انتخاب صندوق...</option>';
+        if (!data || data.length === 0) {
+            [{Code:'10100010001',Name:'صندوق اصلی'},{Code:'10100010002',Name:'صندوق فرعی'}].forEach(item => {
+                select.appendChild(new Option(item.Name, item.Code));
+            });
+            select.value = '10100010001';
+        } else {
+            data.forEach(item => select.appendChild(new Option(item.Name, item.Code)));
+        }
+    }).fail(function() {
+        const select = document.getElementById('cashSarfasl');
+        select.innerHTML = '<option value="10100010001">صندوق اصلی</option><option value="10100010002">صندوق فرعی</option>';
+        select.value = '10100010001';
+    });
+}
+
+function loadCostAndIncomeHeaders() {
+    $.get('/api/meta/cost-headers/db', function(data) {
+        document.querySelectorAll('.cost-sarfasl').forEach(select => {
+            const cur = select.value;
+            select.innerHTML = '<option value="">انتخاب سرفصل هزینه...</option>';
+            if (Array.isArray(data)) data.forEach(item => {
+                select.appendChild(new Option(item.Name || item.name || 'بدون نام', item.sarfaslCode || item.Code || ''));
+            });
+            if (cur) select.value = cur;
+        });
+    });
+    $.get('/api/meta/income-headers/db', function(data) {
+        document.querySelectorAll('.income-sarfasl').forEach(select => {
+            const cur = select.value;
+            select.innerHTML = '<option value="">انتخاب سرفصل درآمد...</option>';
+            if (Array.isArray(data)) data.forEach(item => {
+                select.appendChild(new Option(item.Name || item.name || 'بدون نام', item.sarfaslCode || item.Code || ''));
+            });
+            if (cur) select.value = cur;
+        });
+    });
+}
+
+function loadBankAccounts() {
+    $.get('/api/bank-accounts/list', function(data) {
+        const bankSel = document.getElementById('bankAccount');
+        const chequeSel = document.getElementById('chequeBank');
+        bankSel.innerHTML = '<option value="">انتخاب کنید...</option>';
+        chequeSel.innerHTML = '<option value="">بانک...</option>';
+        data.forEach(acc => {
+            const opt = new Option(acc.DisplayName || `${acc.bankName} - ${acc.accountOwner}`, acc.accountNumber);
+            opt.dataset.sarfasl = acc.sarfaslCode || '';
+            bankSel.appendChild(opt);
+            chequeSel.appendChild(new Option(acc.bankName, acc.accountNumber));
+        });
+        $.get('/api/settings/defaults', function(s) {
+            if (s.default_bank_account) bankSel.value = s.default_bank_account;
+        });
+    });
+}
+
+// =============================================
+// تامین‌کننده
+// =============================================
+function searchSuppliers(query) {
+    const container = $('#supplierSearchResults');
+    container.empty().append('<div class="list-group-item text-muted">در حال جستجو...</div>').show();
+
+    $.get('/api/purchase/suppliers/search?q=' + encodeURIComponent(query) + '&limit=20', function(data) {
+        if (Array.isArray(data) && data.length > 0) { displaySupplierResults(data); return; }
+        // Fallback: جستجو در همه مشتریان
+        $.get('/api/purchase/suppliers/search/all?q=' + encodeURIComponent(query) + '&limit=20', function(allData) {
+            displaySupplierResults(allData);
+        }).fail(() => {
+            container.empty().append('<div class="list-group-item text-danger">خطا در جستجو</div>');
+        });
+    }).fail(() => {
+        $.get('/api/purchase/suppliers/search/all?q=' + encodeURIComponent(query) + '&limit=20', function(allData) {
+            displaySupplierResults(allData);
+        }).fail(() => {
+            container.empty().append('<div class="list-group-item text-danger">خطا در جستجو</div>');
+        });
+    });
+}
+
+function displaySupplierResults(data) {
+    const container = $('#supplierSearchResults');
+    container.empty();
+    if (!data || data.length === 0) {
+        container.append('<div class="list-group-item text-muted">تامین‌کننده‌ای یافت نشد</div>').show();
+        return;
+    }
+    data.forEach(s => {
+        const displayName = s.Code ? `${s.Code} - ${s.Name}` : (s.Name || 'بدون نام');
+        const item = $(`<a href="#" class="list-group-item list-group-item-action" 
+            data-erp="${s.ErpCode}" data-code="${s.Code||''}" data-name="${s.Name||''}">
+            <strong>${displayName}</strong></a>`);
+        item.on('click', function(e) {
+            e.preventDefault();
+            selectSupplier($(this).data('erp'), $(this).data('code'), $(this).data('name'));
+        });
+        container.append(item);
+    });
+    container.show();
+}
+
+function selectSupplier(erpCode, code, name) {
+    selectedSupplier = { ErpCode: erpCode, Code: code, Name: name };
+    $('#selectedSupplierErp').val(erpCode);
+    $('#supplierSearch').val(name);
+    $('#selectedSupplierDisplay').html(`تامین‌کننده: <strong>${code || '---'} - ${name}</strong>`);
+    $('#supplierSearchResults').hide();
+    playSuccessBeep();
+}
+
+function loadDefaultSupplier() {
+    $.get('/api/purchase/suppliers/default', function(data) {
+        if (data.ErpCode) selectSupplier(data.ErpCode, data.Code, data.Name);
+    });
+}
+
+// =============================================
+// جستجوی کالا
+// =============================================
+function searchProductsLive(query) {
+    if (!query || query.length < 1) { $('#productSuggestions').hide(); return; }
+    $.get('/api/purchase/products?q=' + encodeURIComponent(query), function(data) {
+        const container = document.getElementById('productSuggestions');
+        container.innerHTML = '';
+        if (!data.length) { container.style.display = 'none'; return; }
+        data.forEach(p => {
+            const stock = p.Few || 0;
+            const stockColor = stock <= 0 ? 'color:#ef4444;' : '';
+            const item = document.createElement('a');
+            item.href = '#';
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                <div><strong>${p.Code}</strong> - ${p.Name}<br><small class="text-muted" style="${stockColor}">موجودی: ${stock}</small></div>
+                <div class="text-end"><small class="text-muted">قیمت خرید:</small><br><strong>${formatNumber(p.BuyPrice)}</strong></div></div>`;
+            item.onclick = function(e) {
+                e.preventDefault();
+                selectedProduct = p;
+                document.getElementById('productSearch').value = p.Name;
+                if (p.BuyPrice > 0) document.getElementById('priceInput').value = p.BuyPrice;
+                container.style.display = 'none';
+                document.getElementById('priceInput').focus();
+                document.getElementById('priceInput').select();
+                playSuccessBeep();
+            };
+            container.appendChild(item);
+        });
+        container.style.display = 'block';
+    });
+}
+
+function searchProduct() {
+    const q = document.getElementById('productSearch').value.trim();
+    if (!q) return;
+    if (selectedProduct && selectedProduct.Name === q) {
+        playSuccessBeep();
+        document.getElementById('priceInput').focus();
+        document.getElementById('priceInput').select();
+    } else {
+        searchProductsLive(q);
+    }
+}
+
+// =============================================
+// افزودن کالا به فاکتور
+// =============================================
+function addProductToInvoice() {
+    if (!selectedProduct) { playErrorBeep(); alert('لطفاً ابتدا یک کالا را جستجو و انتخاب کنید.'); document.getElementById('productSearch').focus(); return; }
+    let qty = parseInt(document.getElementById('quantityInput').value) || 1;
+    if (qty <= 0) qty = 1;
+    let manualPrice = parseFloat(document.getElementById('priceInput').value) || 0;
+    if (manualPrice <= 0) { playErrorBeep(); alert('لطفاً قیمت خرید را وارد کنید.'); document.getElementById('priceInput').focus(); return; }
+
+    const existingIndex = invoiceItems.findIndex(item => item.ErpCode === selectedProduct.ErpCode);
+    if (existingIndex !== -1) {
+        invoiceItems[existingIndex].quantity += qty;
+        invoiceItems[existingIndex].price = manualPrice;
+        invoiceItems[existingIndex].totalPrice = manualPrice * invoiceItems[existingIndex].quantity;
+    } else {
+        invoiceItems.push({
+            row: ++rowCounter, ErpCode: selectedProduct.ErpCode, barcode: selectedProduct.Code,
+            name: selectedProduct.Name, quantity: qty, price: manualPrice, totalPrice: manualPrice * qty
+        });
+    }
+    renderInvoiceTable();
+    updatePaymentSummary();
+    playSuccessBeep();
+    selectedProduct = null;
+    document.getElementById('productSearch').value = '';
+    document.getElementById('quantityInput').value = 1;
+    document.getElementById('priceInput').value = '';
+    document.getElementById('productSearch').focus();
+}
+
+// =============================================
+// محاسبات و رندر
+// =============================================
+function calculateTotalAmount() {
+    let total = 0;
+    invoiceItems.forEach(item => { total += item.price * item.quantity; });
+    return Math.round(total);
+}
+function calculateNetPayable() { return Math.max(0, calculateTotalAmount()); }
+
+function renderInvoiceTable() {
+    const tbody = document.getElementById('invoiceItemsBody');
+    tbody.innerHTML = '';
+    invoiceItems.forEach((item, index) => {
+        tbody.innerHTML += `<tr>
+            <td>${item.row}</td><td>${item.barcode}</td><td>${item.name}</td>
+            <td><div class="input-group input-group-sm" style="max-width:110px;">
+                <button class="btn btn-outline-secondary" onclick="changeQuantity(${index},-1)">-</button>
+                <input type="number" class="form-control text-center" value="${item.quantity}" min="1" onchange="updateQuantity(${index},this.value)">
+                <button class="btn btn-outline-secondary" onclick="changeQuantity(${index},1)">+</button>
+            </div></td>
+            <td class="text-end">${formatNumber(item.price)}</td>
+            <td class="text-end fw-bold">${formatNumber(item.totalPrice)}</td>
+            <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="removeItem(${index})">×</button></td>
+        </tr>`;
+    });
+    document.getElementById('totalAmount').innerText = formatNumber(calculateTotalAmount());
+    document.getElementById('netPayable').innerText = formatNumber(calculateNetPayable());
+}
+
+function removeItem(index) {
+    invoiceItems.splice(index, 1);
+    invoiceItems.forEach((item, idx) => { item.row = idx + 1; });
+    rowCounter = invoiceItems.length;
+    renderInvoiceTable();
+    updatePaymentSummary();
+}
+function changeQuantity(index, delta) {
+    const item = invoiceItems[index]; if (!item) return;
+    updateQuantity(index, Math.max(1, item.quantity + delta));
+}
+function updateQuantity(index, newQty) {
+    newQty = parseInt(newQty) || 1; if (newQty < 1) newQty = 1;
+    const item = invoiceItems[index]; if (!item) return;
+    item.quantity = newQty; item.totalPrice = item.price * newQty;
+    renderInvoiceTable(); updatePaymentSummary();
+}
+function updatePaymentSummary() { renderInvoiceTable(); }
+
+// =============================================
+// مدیریت پرداخت
+// =============================================
+function togglePaymentFields() {
+    const method = document.getElementById('paymentMethod').value;
+    document.getElementById('cashSection').style.display = (method === 'cash') ? 'block' : 'none';
+    document.getElementById('bankSelection').style.display = (method === 'bank' || method === 'cheque') ? 'block' : 'none';
+    document.getElementById('chequeDetails').style.display = (method === 'cheque') ? 'block' : 'none';
+}
+
+function addCostItem() {
+    const container = document.getElementById('costItemsContainer');
+    const newRow = container.querySelector('.cost-item').cloneNode(true);
+    newRow.querySelector('.cost-amount').value = '';
+    container.appendChild(newRow);
+    loadCostAndIncomeHeaders();
+    newRow.querySelector('.remove-cost-item').addEventListener('click', function() {
+        if (container.querySelectorAll('.cost-item').length > 1) this.closest('.cost-item').remove();
+        else alert('حداقل یک ردیف هزینه باید وجود داشته باشد.');
+    });
+}
+function addIncomeItem() {
+    const container = document.getElementById('incomeItemsContainer');
+    const newRow = container.querySelector('.income-item').cloneNode(true);
+    newRow.querySelector('.income-amount').value = '';
+    container.appendChild(newRow);
+    loadCostAndIncomeHeaders();
+    newRow.querySelector('.remove-income-item').addEventListener('click', function() {
+        if (container.querySelectorAll('.income-item').length > 1) this.closest('.income-item').remove();
+        else alert('حداقل یک ردیف درآمد باید وجود داشته باشد.');
+    });
+}
+
+// =============================================
+// تبدیل تاریخ شمسی به میلادی (سرور)
+// =============================================
+function convertDateOnServer(shamsiDate) {
+    let result = null;
+    $.ajax({
+        url: '/api/convert-date', type: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ shamsi_date: shamsiDate }), async: false,
+        success: function(response) {
+            if (response.status === 'success') result = response.miladi_date;
+        }
+    });
+    return result;
+}
+
+// =============================================
+// ثبت فاکتور خرید
+// =============================================
+function registerPurchaseInvoice() {
+    if (invoiceItems.length === 0) { playErrorBeep(); alert('هیچ کالایی به فاکتور اضافه نشده است.'); return; }
+    let supplierErp = $('#selectedSupplierErp').val();
+    if (!supplierErp) { playErrorBeep(); alert('لطفاً تامین‌کننده را انتخاب کنید.'); $('#supplierSearch').focus(); return; }
+
+    const shamsiDate = document.getElementById('invoiceDate').value.trim();
+    if (!shamsiDate) { playErrorBeep(); alert('لطفاً تاریخ فاکتور را وارد کنید.'); document.getElementById('invoiceDate').focus(); return; }
+    const miladiDate = convertDateOnServer(shamsiDate);
+    if (!miladiDate) { playErrorBeep(); alert('تاریخ وارد شده معتبر نیست. فرمت صحیح: ۱۴۰۴/۰۲/۱۵'); document.getElementById('invoiceDate').focus(); return; }
+
+    const paymentMethod = document.getElementById('paymentMethod').value;
+    const time = document.getElementById('invoiceTime').value || '12:00';
+    const comment = document.getElementById('invoiceComment').value || '';
+    const netPayable = calculateNetPayable();
+
+    const details = invoiceItems.map(item => ({
+        ProductErpCode: item.ErpCode, few: item.quantity, price: item.price, discountprice: 0, discountpercent: 0
+    }));
+
+    const uniqueId = Date.now().toString() + Math.floor(Math.random() * 10000).toString();
+    const payload = {
+        id: uniqueId, type: 3, customererpcode: supplierErp,
+        date: miladiDate, time: time, comment: comment, detailinfo: details
+    };
+
+    // هزینه‌ها
+    const costList = [];
+    document.querySelectorAll('.cost-item').forEach(item => {
+        const sarfasl = item.querySelector('.cost-sarfasl').value;
+        const amount = parseFloat(item.querySelector('.cost-amount').value);
+        if (sarfasl && amount > 0) costList.push({ customererpcode: supplierErp, hazinehsarfaslcode: sarfasl, hazinehamount: amount });
+    });
+    if (costList.length > 0) payload.hazineinfo = costList;
+
+    // درآمدها
+    const incomeList = [];
+    document.querySelectorAll('.income-item').forEach(item => {
+        const sarfasl = item.querySelector('.income-sarfasl').value;
+        const amount = parseFloat(item.querySelector('.income-amount').value);
+        if (sarfasl && amount > 0) incomeList.push({ customererpcode: supplierErp, sarfaslcode: sarfasl, amount: amount });
+    });
+    if (incomeList.length > 0) payload.incomeinfo = incomeList;
+
+    // پرداخت
+    if (paymentMethod === 'cash') {
+        payload.Cash = netPayable;
+        payload.CashSarfasl = document.getElementById('cashSarfasl')?.value || '10100010001';
+    } else if (paymentMethod === 'bank') {
+        const bankSel = document.getElementById('bankAccount');
+        const bankSarfasl = bankSel.options[bankSel.selectedIndex]?.dataset?.sarfasl || '';
+        if (!bankSarfasl) { playErrorBeep(); alert('لطفاً حساب بانکی معتبر انتخاب کنید.'); return; }
+        payload.Bank = netPayable; payload.BankSarfasl = bankSarfasl;
+    } else if (paymentMethod === 'cheque') {
+        const cn = document.getElementById('chequeNumber').value;
+        const cd = document.getElementById('chequeDate').value;
+        const cb = document.getElementById('chequeBank').value;
+        if (!cn || !cd || !cb) { playErrorBeep(); alert('لطفاً تمام اطلاعات چک را وارد کنید.'); return; }
+        payload.checkinfo = { checks: [{ checkNumber: cn, receiveDate: cd, bankCode: cb, accountNumber: document.getElementById('chequeAccount').value || '', cust: netPayable }] };
+    } else if (paymentMethod === 'nesiyeh') {
+        payload.Nesiyeh = netPayable;
+    }
+
+    console.log('📤 Final Payload:', JSON.stringify(payload, null, 2));
+    const registerBtn = document.getElementById('registerBtn');
+    const originalText = registerBtn.innerHTML;
+    registerBtn.disabled = true; registerBtn.innerHTML = 'در حال ثبت...';
+
+    $.ajax({
+        url: '/api/pos/register', type: 'POST', contentType: 'application/json',
+        data: JSON.stringify(payload), timeout: 60000,
+        success: function(response) {
+            registerBtn.disabled = false; registerBtn.innerHTML = originalText;
+            if (response.status === 'success') {
+                const invNum = response.invoiceNumber || response.ReturnParam1 || '-';
+                document.getElementById('invoiceNumber').value = invNum;
+                const codes = invoiceItems.map(i => i.ErpCode);
+                $.ajax({ url:'/api/update-product-stock', type:'POST', contentType:'application/json',
+                    data: JSON.stringify({product_erp_codes: codes}), complete: () => showPurchaseSuccessModal(response) });
+            } else {
+                playErrorBeep();
+                alert('خطا در ثبت فاکتور:\n' + (response.message || response.Failure?.Error || 'خطای ناشناخته'));
+            }
+        },
+        error: function(err) {
+            registerBtn.disabled = false; registerBtn.innerHTML = originalText;
+            playErrorBeep();
+            alert('خطا:\n' + (err.responseJSON?.message || err.responseJSON?.Failure?.Error || err.statusText));
+        }
+    });
+}
+
+function showPurchaseSuccessModal(response) {
+    const invNum = response.invoiceNumber || response.ReturnParam1 || '-';
+    const docNum = response.documentNumber || response.ReturnParam2 || '-';
+    const total = document.getElementById('netPayable').textContent || '0';
+    alert(`فاکتور خرید با موفقیت ثبت شد!\nشماره فاکتور: ${invNum}\nشماره سند: ${docNum}\nمبلغ: ${total} ریال`);
+    resetInvoicePage();
+}
+
+function resetInvoicePage() {
+    invoiceItems = []; rowCounter = 0;
+    renderInvoiceTable(); updatePaymentSummary();
+    document.getElementById('invoiceComment').value = '';
+    document.getElementById('paymentMethod').value = 'cash';
+    document.getElementById('invoiceNumber').value = 'خودکار';
+    document.getElementById('invoiceDate').value = '';
+    togglePaymentFields();
+    loadDefaultSupplier();
+    document.getElementById('productSearch').focus();
+}
+</script>
+
+<style>
+#supplierSearchResults .list-group-item:hover,
+#productSuggestions .list-group-item:hover { background-color: rgba(59,130,246,0.06); cursor:pointer; }
+.cost-item, .income-item { border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+.cost-item:last-child, .income-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}

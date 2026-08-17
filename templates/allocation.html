@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>🏭 مدیریت تولید و تخصیص (مادر-فرزند)</h3>
+    </div>
+
+    <!-- بخش جستجو -->
+    <div class="row g-2 mb-4">
+        <div class="col-md-8">
+            <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="جستجوی نام یا کد کالای مادر...">
+        </div>
+        <div class="col-md-4">
+            <button class="btn btn-primary w-100" onclick="loadMothers(1)">🔍 جستجو</button>
+        </div>
+    </div>
+
+    <!-- جدول مادران -->
+    <div class="table-responsive">
+        <table class="table table-hover border align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>کد کالا</th>
+                    <th>نام کالای مادر</th>
+                    <th class="text-end">موجودی فعلی</th>
+                    <th class="text-center">تعداد تولیدی‌ها</th>
+                    <th class="text-center">عملیات</th>
+                </tr>
+            </thead>
+            <tbody id="mothersTableBody">
+                <tr><td colspan="5" class="text-center py-4 text-muted">برای مشاهده لیست کلیک کنید یا جستجو نمایید...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- صفحه‌بندی -->
+    <nav aria-label="Page navigation" class="mt-3">
+        <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
+</div>
+
+<!-- مودال تخصیص هوشمند دوطرفه -->
+<div class="modal fade" id="allocationModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="modalTitle">مدیریت تولید: <span id="modalMotherName">...</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                
+                <!-- خلاصه وضعیت مادر -->
+                <div class="alert alert-secondary d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <strong>موجودی فعلی مادر:</strong> 
+                        <span id="modalCurrentStock" class="fs-4 fw-bold ms-2">0</span>
+                    </div>
+                </div>
+
+                <!-- ✅ پنل مدیریت فرمول سبد (فقط برای PJ نمایش داده می‌شود) -->
+                <div id="comboFormulaSection" class="alert alert-warning border-warning mb-4" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0 text-dark">🧪 فرمول ساخت سبد (مواد اولیه مورد نیاز)</h6>
+                        <button class="btn btn-sm btn-outline-dark" onclick="toggleFormulaEdit()">✏️ ویرایش فرمول</button>
+                    </div>
+                    
+                    <!-- نمایش وضعیت فرمول -->
+                    <div id="formulaStatusDisplay" class="small text-muted mb-2">
+                        <!-- اینجا پیام "فرمول ذخیره شده" یا "هنوز تعریف نشده" نمایش داده می‌شود -->
+                    </div>
+
+                    <!-- فرم ویرایش فرمول (مخفی تا زمان کلیک روی ویرایش) -->
+                    <div id="formulaEditor" style="display:none;" class="mt-3 border-top pt-3 bg-white p-3 rounded">
+                        <div class="row g-2 align-items-end mb-2">
+                            <div class="col-md-5 position-relative">
+                                <label class="form-label small fw-bold">جستجوی کالای مادر (ماده اولیه)</label>
+                                <input type="text" id="formulaSearchInput" class="form-control form-control-sm" placeholder="نام یا بارکد مادر..." autocomplete="off">
+                                <!-- نتایج جستجو -->
+                                <div id="formulaSearchResults" class="list-group position-absolute w-100 shadow-sm" style="display:none; z-index:1000; max-height:200px; overflow-y:auto; background:white;"></div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold">ضریب مصرف (تعداد)</label>
+                                <input type="number" id="formulaMultiplierInput" class="form-control form-control-sm" value="1" min="0.1" step="0.1">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-primary w-100" onclick="addIngredientToFormula()">➕ افزودن</button>
+                            </div>
+                        </div>
+                        
+                        <!-- جدول مواد اولیه اضافه شده -->
+                        <table class="table table-sm table-bordered mt-2 bg-white">
+                            <thead class="table-light"><tr><th>نام مادر</th><th width="100">ضریب</th><th width="50">حذف</th></tr></thead>
+                            <tbody id="formulaIngredientsBody"></tbody>
+                        </table>
+                        <button class="btn btn-success btn-sm w-100 mt-2" onclick="saveCurrentFormula()">💾 ذخیره نهایی فرمول</button>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <!-- ستون راست: تولید از مادر به فرزند -->
+                    <div class="col-md-6">
+                        <div class="card h-100 border-success">
+                            <div class="card-header bg-success text-white d-flex justify-content-between">
+                                <span>➡️ تولید به فرزند (کسر از مادر)</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px;">
+                                    <table class="table table-sm table-striped mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>نام تولیدی</th>
+                                                <th width="15%">ضریب</th>
+                                                <th width="20%" class="text-end">موجودی</th>
+                                                <th width="25%" class="text-center">تعداد تولید</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="produceToChildBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ستون چپ: بازگشت از فرزند به مادر -->
+                    <div class="col-md-6">
+                        <div class="card h-100 border-warning">
+                            <div class="card-header bg-warning text-dark d-flex justify-content-between">
+                                <span>⬅️ بازگشت به مادر (کسر از فرزند)</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px;">
+                                    <table class="table table-sm table-striped mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>نام تولیدی</th>
+                                                <th width="15%">ضریب</th>
+                                                <th width="20%" class="text-end">موجودی</th>
+                                                <th width="25%" class="text-center">تعداد بازگشت</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="returnToMotherBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer bg-white">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                <button type="button" class="btn btn-primary px-5" onclick="executeOperations()">
+                    ✅ ثبت نهایی عملیات
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentMotherData = null;
+let modalInstance = null;
+let currentFormulaIngredients = []; // [{mother_erp, name, multiplier}]
+let activeChildErpForFormula = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+    modalInstance = new bootstrap.Modal(document.getElementById('allocationModal'));
+    loadMothers(1);
+});
+
+// ==========================================
+// 1. لود لیست مادران (برای نمایش اصلی)
+// ==========================================
+function loadMothers(page) {
+    const query = document.getElementById('searchInput').value.trim();
+    const tbody = $('#mothersTableBody');
+    tbody.empty();
+    tbody.html('<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div> در حال دریافت...</td></tr>');
+
+    $.get(`/api/allocation/mothers?page=${page}&q=${encodeURIComponent(query)}`, function(res) {
+        tbody.empty();
+        if (res.items.length === 0) {
+            tbody.html('<tr><td colspan="5" class="text-center text-muted py-4">موردی یافت نشد.</td></tr>');
+            $('#pagination').empty();
+            return;
+        }
+        res.items.forEach(m => {
+            const stockClass = m.Stock < 0 ? 'text-danger fw-bold' : 'text-success';
+            tbody.append(`
+                <tr>
+                    <td><code>${m.Code}</code></td>
+                    <td><strong>${m.Name}</strong></td>
+                    <td class="text-end ${stockClass}">${Number(m.Stock).toLocaleString()}</td>
+                    <td class="text-center"><span class="badge bg-info">${m.ChildrenCount} فرزند</span></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-primary" onclick='openAllocationModal("${m.ErpCode}")'>
+                            ⚙️ تخصیص
+                        </button>
+                    </td>
+                </tr>
+            `);
+        });
+        renderPagination(res.page, res.total_pages, query);
+    }).fail(err => {
+        tbody.html('<tr><td colspan="5" class="text-center text-danger">خطا در دریافت اطلاعات</td></tr>');
+    });
+}
+
+function renderPagination(current, total, query) {
+    const ul = $('#pagination');
+    ul.empty();
+    if (total <= 1) return;
+    ul.append(`<li class="page-item ${current==1?'disabled':''}"><a class="page-link" href="#" onclick="loadMothers(${current-1});return false;">قبلی</a></li>`);
+    for(let i=1; i<=total; i++) {
+        if(i===1 || i===total || (i>=current-1 && i<=current+1)) {
+            ul.append(`<li class="page-item ${i===current?'active':''}"><a class="page-link" href="#" onclick="loadMothers(${i});return false;">${i}</a></li>`);
+        } else if (i===current-2 || i===current+2) {
+            ul.append(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+        }
+    }
+    ul.append(`<li class="page-item ${current==total?'disabled':''}"><a class="page-link" href="#" onclick="loadMothers(${current+1});return false;">بعدی</a></li>`);
+}
+
+// ==========================================
+// 2. باز کردن مودال و رندر فرزندان
+// ==========================================
+function openAllocationModal(erpCode) {
+    $('#modalMotherName').text('در حال بارگذاری...');
+    $('#comboFormulaSection').hide(); // مخفی کردن پنل فرمول در ابتدا
+    modalInstance.show();
+
+    $.get(`/api/allocation/details/${erpCode}`, function(data) {
+        currentMotherData = data;
+        $('#modalMotherName').text(data.mother.Name);
+        $('#modalCurrentStock').text(Number(data.mother.Stock).toLocaleString());
+        renderModalTables(data.children);
+    }).fail(() => {
+        alert('خطا در دریافت جزئیات');
+        modalInstance.hide();
+    });
+}
+
+function renderModalTables(children) {
+    const produceBody = $('#produceToChildBody'); 
+    const returnBody = $('#returnToMotherBody');  
+    
+    produceBody.empty();
+    returnBody.empty();
+
+    if (!children || children.length === 0) {
+        produceBody.html('<tr><td colspan="4" class="text-center text-muted">هیچ کالای تولیدی یافت نشد.</td></tr>');
+        returnBody.html('<tr><td colspan="4" class="text-center text-muted">هیچ کالای تولیدی یافت نشد.</td></tr>');
+        return;
+    }
+
+    children.forEach((child, idx) => {
+        const stockClass = child.Stock < 0 ? 'text-danger fw-bold' : 'text-muted';
+        const packSize = child.PackSize || 1; 
+        const isCombo = child.PackType === 'COMBO';
+        const packTypeLabel = isCombo ? '<span class="badge bg-warning text-dark ms-1">سبد</span>' : '';
+        const rowClass = isCombo ? 'table-warning' : '';
+        
+        // اگر سبد باشد، با کلیک روی ردیف فرمول لود می‌شود
+        const clickAction = isCombo ? `onclick="loadComboDetails('${child.ErpCode}')"` : '';
+
+        produceBody.append(`
+            <tr class="${rowClass}" ${clickAction} style="cursor:${isCombo?'pointer':'default'}">
+                <td>${child.Name}${packTypeLabel}<br><small class="text-muted">${child.Code}</small></td>
+                <td class="text-center"><span class="badge bg-secondary">×${packSize}</span></td>
+                <td class="text-end ${stockClass}">${Number(child.Stock).toLocaleString()}</td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm text-center input-produce" 
+                           data-idx="${idx}" min="0" placeholder="0" onchange="validateInput(this)">
+                </td>
+            </tr>
+        `);
+
+        const canReturn = child.Stock > 0 && !isCombo;
+        returnBody.append(`
+            <tr class="${!canReturn ? 'opacity-50' : ''}">
+                <td>${child.Name}${packTypeLabel}<br><small class="text-muted">${child.Code}</small></td>
+                <td class="text-center"><span class="badge bg-secondary">×${packSize}</span></td>
+                <td class="text-end ${stockClass}">${Number(child.Stock).toLocaleString()}</td>
+                <td class="text-center">
+                    ${canReturn ? 
+                      `<input type="number" class="form-control form-control-sm text-center input-return" 
+                             data-idx="${idx}" min="0" max="${Math.floor(child.Stock)}" placeholder="0" onchange="validateInput(this)">` 
+                      : '<span class="text-muted small">-</span>'}
+                </td>
+            </tr>
+        `);
+    });
+}
+
+// ==========================================
+// 3. منطق فرمول سبد (PJ) - ✅ اصلاح شده برای جستجوی همه کالاها
+// ==========================================
+function loadComboDetails(childErp) {
+    const child = currentMotherData.children.find(c => c.ErpCode === childErp);
+    if(child && child.PackType === 'COMBO') {
+        activeChildErpForFormula = childErp;
+        $('#comboFormulaSection').show();
+        
+        // لود فرمول از سرور
+        $.get(`/api/allocation/get-formula/${childErp}`, function(res) {
+            currentFormulaIngredients = [];
+            if(res && res.length > 0) {
+                res.forEach(item => {
+                    // اینجا نام را موقتاً ErpCode می‌گذاریم تا زمانی که کاربر جستجو کند و نام کامل بیاید
+                    // یا می‌توانیم یک درخواست جداگانه بزنیم اما برای سرعت فعلا همینطور
+                    currentFormulaIngredients.push({...item, name: `کالا (${item.mother_erp})`}); 
+                });
+                $('#formulaStatusDisplay').html(`<span class="text-success fw-bold">✅ فرمول ذخیره شده فعال است (${res.length} ماده اولیه)</span>`);
+            } else {
+                $('#formulaStatusDisplay').html(`<span class="text-danger fw-bold">⚠️ فرمولی تعریف نشده است. لطفاً مواد اولیه را اضافه کنید.</span>`);
+                toggleFormulaEdit(); // باز کردن اتوماتیک ادیتور
+            }
+            renderFormulaTable();
+        });
+    }
+}
+
+function toggleFormulaEdit() {
+    const editor = document.getElementById('formulaEditor');
+    editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+}
+
+// ✅ اصلاح: جستجو در تمام کالاها (نه فقط مادران)
+$('#formulaSearchInput').on('input', function() { 
+    const q = $(this).val();
+    if(q.length < 2) { $('#formulaSearchResults').hide(); return; }
+    
+    // استفاده از API عمومی جستجوی کالاها
+    $.get(`/api/build/products?q=${encodeURIComponent(q)}`, function(res) {
+        const container = $('#formulaSearchResults');
+        container.empty();
+        if(!res || res.length === 0) { container.hide(); return; }
+        
+        res.forEach(p => {
+            // نمایش نام، کد و موجودی برای کمک به انتخاب
+            const stockInfo = p.FewTak > 0 ? p.FewTak : (p.Few || 0);
+            const itemHtml = `
+                <a href="#" class="list-group-item list-group-item-action" 
+                   onclick="selectIngredientForFormula('${p.ErpCode}', '${p.Name.replace(/'/g, "\\'")}')">
+                    <div class="d-flex justify-content-between">
+                        <strong>${p.Name}</strong>
+                        <small class="text-muted">${p.Code}</small>
+                    </div>
+                    <small class="text-muted">موجودی: ${Number(stockInfo).toLocaleString()}</small>
+                </a>`;
+            container.append(itemHtml);
+        });
+        container.show();
+    });
+});
+
+function selectIngredientForFormula(erp, name) {
+    if(currentFormulaIngredients.some(i => i.mother_erp === erp)) {
+        alert('این کالا قبلاً اضافه شده است.');
+        return;
+    }
+    currentFormulaIngredients.push({
+        mother_erp: erp,
+        name: name,
+        multiplier: parseFloat($('#formulaMultiplierInput').val()) || 1
+    });
+    renderFormulaTable();
+    $('#formulaSearchInput').val('');
+    $('#formulaSearchResults').hide();
+}
+
+function renderFormulaTable() {
+    const tbody = $('#formulaIngredientsBody');
+    tbody.empty();
+    currentFormulaIngredients.forEach((ing, idx) => {
+        tbody.append(`
+            <tr>
+                <td>${ing.name}</td>
+                <td><input type="number" class="form-control form-control-sm" value="${ing.multiplier}" onchange="updateIngredientMult(${idx}, this.value)"></td>
+                <td><button class="btn btn-sm btn-danger" onclick="removeIngredient(${idx})">×</button></td>
+            </tr>
+        `);
+    });
+}
+
+function updateIngredientMult(idx, val) { currentFormulaIngredients[idx].multiplier = parseFloat(val); }
+function removeIngredient(idx) { currentFormulaIngredients.splice(idx, 1); renderFormulaTable(); }
+
+function saveCurrentFormula() {
+    if(currentFormulaIngredients.length === 0) { alert('هیچ ماده اولیه‌ای اضافه نشده است.'); return; }
+    
+    const payload = {
+        child_erp: activeChildErpForFormula,
+        ingredients: currentFormulaIngredients.map(i => ({mother_erp: i.mother_erp, multiplier: i.multiplier}))
+    };
+    
+    $.ajax({
+        url: '/api/allocation/save-formula',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(res) {
+            if(res.status === 'success') {
+                alert('فرمول با موفقیت ذخیره شد.');
+                $('#formulaStatusDisplay').html(`<span class="text-success fw-bold">✅ فرمول ذخیره شد</span>`);
+                toggleFormulaEdit();
+            } else {
+                alert('خطا در ذخیره: ' + res.message);
+            }
+        }
+    });
+}
+
+// ==========================================
+// 4. اجرای عملیات
+// ==========================================
+function executeOperations() {
+    if (!currentMotherData) return;
+    let operations = [];
+    let hasOperation = false;
+
+    $('.input-produce').each(function() {
+        const qty = parseInt($(this).val()) || 0;
+        if (qty > 0) {
+            const idx = $(this).data('idx');
+            const child = currentMotherData.children[idx];
+            
+            if (child.PackType === 'COMBO') {
+                if (currentFormulaIngredients.length === 0) {
+                    alert(`برای تولید سبد ${child.Name} ابتدا باید فرمول مواد اولیه را تعریف کنید.`);
+                    return; 
+                }
+                
+                currentFormulaIngredients.forEach(ing => {
+                    operations.push({
+                        type: 'PRODUCE_CHILD',
+                        child_erp: child.ErpCode,
+                        child_name: child.Name,
+                        mother_erp: ing.mother_erp, // مادر خاص از فرمول (می‌تواند هر کالایی باشد)
+                        consume_mother: qty * ing.multiplier,
+                        produce_child: qty
+                    });
+                });
+            } else {
+                operations.push({
+                    type: 'PRODUCE_CHILD',
+                    child_erp: child.ErpCode,
+                    child_name: child.Name,
+                    consume_mother: qty * (child.PackSize || 1),
+                    produce_child: qty
+                });
+            }
+            hasOperation = true;
+        }
+    });
+
+    $('.input-return').each(function() {
+        const qty = parseInt($(this).val()) || 0;
+        if (qty > 0) {
+            const idx = $(this).data('idx');
+            const child = currentMotherData.children[idx];
+            
+            if (child.PackType === 'COMBO') {
+                 alert('بازگشت سبد ترکیبی به مادر به صورت خودکار امکان‌پذیر نیست.');
+                 return;
+            }
+
+            operations.push({
+                type: 'RETURN_TO_MOTHER',
+                child_erp: child.ErpCode,
+                child_name: child.Name,
+                consume_child: qty,
+                produce_mother: qty * (child.PackSize || 1)
+            });
+            hasOperation = true;
+        }
+    });
+
+    if (!hasOperation) {
+        alert('هیچ تغییری وارد نشده است.');
+        return;
+    }
+
+    if (!confirm(`آیا از اجرای ${operations.length} عملیات اطمینان دارید؟`)) return;
+
+    const btn = document.querySelector('.modal-footer .btn-primary');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> در حال اجرا...';
+
+    $.ajax({
+        url: '/api/allocation/execute',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            mother_erp: currentMotherData.mother.ErpCode,
+            operations: operations
+        }),
+        success: function(res) {
+            let successCount = res.results.filter(r => r.success).length;
+            let failCount = res.results.length - successCount;
+            alert(`عملیات پایان یافت.\n✅ موفق: ${successCount}\n❌ خطا: ${failCount}`);
+            modalInstance.hide();
+            loadMothers(1);
+        },
+        error: function(err) {
+            alert('خطا در ارتباط با سرور: ' + (err.responseJSON?.message || err.responseText));
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+}
+
+function validateInput(input) {
+    let val = parseInt(input.value);
+    if (isNaN(val) || val < 0) input.value = 0;
+}
+</script>
+{% endblock %}
