@@ -12,7 +12,6 @@ def register_blueprints(app):
     from .settings import settings_bp
     from .allocation import allocation_bp
     from .webhook import webhook_bp  # ✅ اضافه شد
-
     app.register_blueprint(sync_bp)
     app.register_blueprint(pos_bp)
     app.register_blueprint(purchase_bp)

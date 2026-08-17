@@ -1,10 +1,9 @@
-# routes/webhook.py - تابع کامل و اصلاح‌شده receive_holoo_webhook
-
+# routes/webhook.py - نسخه کامل و نهایی
 import json
 import threading
 import os
 from datetime import datetime
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from db_manager import save_product_batch, save_customers, DB_PATH
 
 webhook_bp = Blueprint('webhook', __name__)
@@ -91,7 +90,6 @@ def _refresh_entities_from_webhook(table_name, erp_codes):
                     print(f"⚠️ Could not find product {erp_code} in Holoo for refresh")
                     
             elif table_name == 'customer':
-                # برای مشتریان: دریافت همه و فیلتر (چون API جستجوی ErpCode مستقیم ندارد)
                 customers = api.get_customers()
                 matched = [c for c in customers if c.get('ErpCode') == erp_code]
                 if matched:
@@ -106,6 +104,28 @@ def _refresh_entities_from_webhook(table_name, erp_codes):
     
     print(f"🔄 Webhook refresh complete: {refreshed}/{len(erp_codes)} entities updated")
 
+
+# ==================== اندپوینت‌های داشبورد ====================
+
+@webhook_bp.route('/webhook', methods=['GET'])
+def webhook_dashboard():
+    """صفحه نمایش لاگ‌های وب‌هوک"""
+    return render_template('webhook.html')
+
+
+@webhook_bp.route('/webhook/logs', methods=['GET'])
+def get_webhook_logs():
+    """API دریافت لاگ‌ها برای نمایش زنده در داشبورد"""
+    if not os.path.exists(WEBHOOK_LOG_FILE):
+        return jsonify([])
+    try:
+        with open(WEBHOOK_LOG_FILE, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify([])
+
+
+# ==================== اندپوینت دریافت وب‌هوک ====================
 
 @webhook_bp.route('/webhook/receive', methods=['POST'])
 def receive_holoo_webhook():
@@ -137,7 +157,6 @@ def receive_holoo_webhook():
         # اگر n8n داده را در کلید body پیچیده باشد: {"body": {...}}
         if isinstance(data, dict) and 'body' in data:
             body_data = data['body']
-            # body خودش ممکن است لیست باشد
             if isinstance(body_data, list):
                 data = body_data[0] if body_data else {}
             else:
@@ -196,7 +215,6 @@ def receive_holoo_webhook():
             erp_codes = [item.get('ErpCode') for item in changed_items if isinstance(item, dict) and item.get('ErpCode')]
             _log_webhook_event(table_name, operation, items_count, "Received", f"ERPs: {erp_codes[:5]}")
             
-            # ✅ بروزرسانی خودکار از هلو در ترد جداگانه
             if erp_codes:
                 threading.Thread(
                     target=_refresh_entities_from_webhook,
