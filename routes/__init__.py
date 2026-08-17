@@ -10,7 +10,8 @@ def register_blueprints(app):
     from .build import build_bp
     from .products import products_bp
     from .settings import settings_bp
-    from .allocation import allocation_bp  # ✅ اضافه شد
+    from .allocation import allocation_bp
+    from .webhook import webhook_bp  # ✅ اضافه شد
 
     app.register_blueprint(sync_bp)
     app.register_blueprint(pos_bp)
@@ -19,6 +20,7 @@ def register_blueprints(app):
     app.register_blueprint(build_bp)
     app.register_blueprint(products_bp)
     app.register_blueprint(settings_bp)
-    app.register_blueprint(allocation_bp)  # ✅ اضافه شد
-    
+    app.register_blueprint(allocation_bp)
+    app.register_blueprint(webhook_bp)  # ✅ اضافه شد
+
     print("✅ تمامی بلوپرینت‌ها با موفقیت ثبت شدند.")
