@@ -1,4 +1,4 @@
-# routes/webhook.py - نسخه کامل و نهایی
+# routes/webhook.py - نسخه کامل و نهایی (جایگزین کامل فایل)
 import json
 import threading
 import os
@@ -57,8 +57,8 @@ def _get_api_for_webhook():
 
 def _refresh_entities_from_webhook(table_name, erp_codes):
     """
-    بروزرسانی موجودیت‌ها از هلو پس از دریافت وب‌هوک
-    چون هلو فقط فیلدهای تغییر یافته را می‌فرستد، باید کل رکورد را دوباره بگیریم
+    ✅ بروزرسانی واقعی دیتابیس پس از دریافت وب‌هوک
+    چون هلو فقط فیلدهای تغییر یافته را می‌فرستد، باید کل رکورد را دوباره از API بگیریم
     این تابع در ترد جداگانه اجرا می‌شود تا پاسخ وب‌هوک معطل نشود
     """
     if not erp_codes:
@@ -67,29 +67,39 @@ def _refresh_entities_from_webhook(table_name, erp_codes):
     api = _get_api_for_webhook()
     if not api:
         print("⚠️ API not available for webhook refresh")
+        _log_webhook_event(table_name, "REFRESH", 0, "API Unavailable")
         return
     
     refreshed = 0
+    failed = 0
+    
     for erp_code in erp_codes:
         try:
             if table_name == 'product':
+                # مرحله ۱: پیدا کردن Code یا Name از کش محلی
                 from db_manager import get_product_code_and_name_by_erp
                 code, name = get_product_code_and_name_by_erp(erp_code)
                 
                 product = None
+                # مرحله ۲: تلاش برای دریافت از API با Code
                 if code:
                     product = api.get_product_by_code(code)
+                
+                # مرحله ۳: اگر با Code نشد، با Name تلاش کن
                 if not product and name:
                     product = api.get_product_by_name(name)
                 
+                # مرحله ۴: ذخیره در دیتابیس
                 if product:
                     save_product_batch([product])
                     refreshed += 1
-                    print(f"✅ Product {erp_code} refreshed via webhook")
+                    print(f"✅ Product {erp_code} ({code}) refreshed via webhook")
                 else:
+                    failed += 1
                     print(f"⚠️ Could not find product {erp_code} in Holoo for refresh")
                     
             elif table_name == 'customer':
+                # برای مشتریان: دریافت لیست و فیلتر
                 customers = api.get_customers()
                 matched = [c for c in customers if c.get('ErpCode') == erp_code]
                 if matched:
@@ -97,12 +107,16 @@ def _refresh_entities_from_webhook(table_name, erp_codes):
                     refreshed += 1
                     print(f"✅ Customer {erp_code} refreshed via webhook")
                 else:
-                    print(f"⚠️ Could not find customer {erp_code} in Holoo for refresh")
+                    failed += 1
+                    print(f"⚠️ Could not find customer {erp_code} in Holoo")
                     
         except Exception as e:
+            failed += 1
             print(f"❌ Error refreshing {table_name} {erp_code}: {e}")
     
-    print(f"🔄 Webhook refresh complete: {refreshed}/{len(erp_codes)} entities updated")
+    status_msg = f"Refreshed: {refreshed}, Failed: {failed}"
+    _log_webhook_event(table_name, "REFRESH", refreshed, status_msg)
+    print(f"🔄 Webhook refresh complete: {status_msg}")
 
 
 # ==================== اندپوینت‌های داشبورد ====================
@@ -215,6 +229,7 @@ def receive_holoo_webhook():
             erp_codes = [item.get('ErpCode') for item in changed_items if isinstance(item, dict) and item.get('ErpCode')]
             _log_webhook_event(table_name, operation, items_count, "Received", f"ERPs: {erp_codes[:5]}")
             
+            # ✅ بروزرسانی خودکار از هلو در ترد جداگانه
             if erp_codes:
                 threading.Thread(
                     target=_refresh_entities_from_webhook,
