@@ -1,0 +1,129 @@
+<!-- templates/webhook.html -->
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>📡 مانیتورینگ وب‌هوک هلو</h3>
+        <div>
+            <span id="connectionStatus" class="badge bg-success me-2">فعال</span>
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshLogs()">🔄 بروزرسانی</button>
+            <button class="btn btn-outline-danger btn-sm" onclick="clearLogs()">🗑️ پاکسازی لاگ</button>
+        </div>
+    </div>
+
+    <!-- آمار کلی -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-light border-0 p-3 text-center">
+                <h5 class="text-muted mb-0">کل رویدادها</h5>
+                <h2 class="fw-bold text-primary" id="totalEvents">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light border-0 p-3 text-center">
+                <h5 class="text-muted mb-0">آخرین دریافت</h5>
+                <h6 class="fw-bold text-dark mt-2" id="lastEventTime">-</h6>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light border-0 p-3 text-center">
+                <h5 class="text-muted mb-0">تغییرات کالا</h5>
+                <h2 class="fw-bold text-success" id="productChanges">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light border-0 p-3 text-center">
+                <h5 class="text-muted mb-0">تغییرات مشتری</h5>
+                <h2 class="fw-bold text-info" id="customerChanges">0</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- جدول لاگ‌ها -->
+    <div class="table-responsive">
+        <table class="table table-hover align-middle border">
+            <thead class="table-light">
+                <tr>
+                    <th width="15%">زمان</th>
+                    <th width="15%">جدول</th>
+                    <th width="10%">عملیات</th>
+                    <th width="10%">تعداد</th>
+                    <th width="15%">وضعیت</th>
+                    <th>جزئیات</th>
+                </tr>
+            </thead>
+            <tbody id="logsTableBody">
+                <tr><td colspan="6" class="text-center py-4 text-muted">در حال بارگذاری...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let autoRefreshInterval;
+
+document.addEventListener('DOMContentLoaded', () => {
+    refreshLogs();
+    // بروزرسانی خودکار هر ۵ ثانیه
+    autoRefreshInterval = setInterval(refreshLogs, 5000);
+});
+
+function refreshLogs() {
+    fetch('/webhook/logs')
+        .then(r => r.json())
+        .then(logs => {
+            renderLogs(logs);
+            updateStats(logs);
+        })
+        .catch(err => console.error('Error fetching logs:', err));
+}
+
+function renderLogs(logs) {
+    const tbody = document.getElementById('logsTableBody');
+    tbody.innerHTML = '';
+
+    if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">هنوز رویدادی دریافت نشده است</td></tr>';
+        return;
+    }
+
+    logs.forEach(log => {
+        const opBadge = log.operation === 'UPDATE' ? 'bg-warning text-dark' : 
+                        log.operation === 'CREATE' ? 'bg-success' : 
+                        log.operation === 'DELETE' ? 'bg-danger' : 'bg-secondary';
+        
+        const statusBadge = log.status === 'Received' ? 'text-success' : 'text-danger';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="small text-muted">${log.timestamp}</td>
+            <td><code>${log.table}</code></td>
+            <td><span class="badge ${opBadge}">${log.operation}</span></td>
+            <td class="fw-bold">${log.items_count}</td>
+            <td class="${statusBadge} small">${log.status}</td>
+            <td class="small text-truncate" style="max-width: 300px;" title="${log.details || ''}">${log.details || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function updateStats(logs) {
+    document.getElementById('totalEvents').textContent = logs.length;
+    document.getElementById('lastEventTime').textContent = logs.length > 0 ? logs[0].timestamp.split(' ')[1] : '-';
+    
+    const productCount = logs.filter(l => l.table === 'product').reduce((sum, l) => sum + l.items_count, 0);
+    const customerCount = logs.filter(l => l.table === 'customer').reduce((sum, l) => sum + l.items_count, 0);
+    
+    document.getElementById('productChanges').textContent = productCount;
+    document.getElementById('customerChanges').textContent = customerCount;
+}
+
+function clearLogs() {
+    if(!confirm('آیا مطمئن هستید؟')) return;
+    // می‌توانید یک API برای پاک کردن لاگ بسازید یا فایل را دستی پاک کنید
+    alert('برای پاکسازی، فایل data/webhook_logs.json را حذف کنید.');
+}
+</script>
+{% endblock %}

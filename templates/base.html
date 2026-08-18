@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title|default('اتوماسیون هلو') }}</title>
+    
+    <!-- Bootstrap 5 RTL -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
+    <!-- Vazirmatn Font -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-body: #f4f6f9;
+            --bg-card: #ffffff;
+            --text-main: #2c3e50;
+            --text-muted: #6c757d;
+            --primary: #3b82f6;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 0.95rem;
+            min-height: 100vh;
+        }
+
+        /* نوار ناوبری ساده و مدرن */
+        .navbar {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--text-main) !important;
+            font-size: 1.1rem;
+        }
+
+        .nav-link {
+            color: var(--text-muted) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem !important;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary) !important;
+            background-color: rgba(59, 130, 246, 0.08);
+        }
+
+        /* کارت‌ها */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.25rem;
+            font-weight: 600;
+        }
+
+        /* دکمه‌ها */
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            border-radius: 8px;
+            padding: 0.5rem 1.25rem;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+
+        /* فرم‌ها */
+        .form-control, .form-select {
+            border-color: var(--border-color);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        /* جدول‌ها */
+        .table th {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* استایل منوی سینک */
+        .sync-dropdown .dropdown-menu { min-width: 280px; padding: 10px 0; }
+        .sync-dropdown .dropdown-item { padding: 8px 20px; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+        .sync-dropdown .dropdown-item:hover { background-color: #e3f2fd; }
+        
+        .sync-status-indicator {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 5px;
+        }
+        .sync-status-indicator.idle { background-color: #6c757d; }
+        .sync-status-indicator.running { background-color: #ffc107; animation: blink 1s infinite; }
+        .sync-status-indicator.done { background-color: #28a745; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* مودال سینک */
+        .sync-modal .modal-content { border-radius: 15px; }
+        .sync-modal .modal-header { background: linear-gradient(135deg, #0d6efd, #0dcaf0); color: white; border-radius: 15px 15px 0 0; }
+        .sync-modal .progress { height: 30px; border-radius: 10px; }
+        .sync-modal .progress-bar { font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+
+        /* ریسپانسیو برای موبایل */
+        @media (max-width: 768px) {
+            .navbar-collapse {
+                background: var(--bg-card); padding: 1rem; border-radius: 0 0 12px 12px;
+                border: 1px solid var(--border-color); border-top: none; margin-top: 0.5rem;
+            }
+            .card-body { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- نوار ناوبری -->
+<nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container">
+        <a class="navbar-brand" href="/">🏪 اتوماسیون هلو</a>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto gap-1">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('products.products_list_page') }}">کالاها</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('products.single_edit') }}">ویرایش تکی</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('batch_edit.batch_edit_page') }}">ویرایش دسته‌ای</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('build.build_product_page') }}">تولید</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('pos.pos_invoice_page') }}">فروش</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('purchase.purchase_invoice_page') }}">خرید</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('allocation.allocation_page') }}">⚙️ موتور تخصیص</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('webhook.webhook_dashboard') }}">📡 وب‌هوک</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('settings.settings_page') }}">تنظیمات</a></li>
+            </ul>
+
+            <!-- ========== منوی سینک ========== -->
+            <div class="dropdown sync-dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="syncMenuButton" data-bs-toggle="dropdown">
+                    <span id="syncStatusIndicator" class="sync-status-indicator idle"></span>
+                    سینک
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="syncMenuButton">
+                    <li><a class="dropdown-item" href="#" onclick="startSync('all')">🔄 سینک همه اطلاعات <span class="badge bg-primary rounded-pill ms-auto">کامل</span></a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('purchase')">🛒 سینک فاکتور خرید <span class="badge bg-info rounded-pill ms-auto">اختصاصی</span></a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">سینک بخش‌های جداگانه</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('products')">📦 کالاها <span id="syncStatusProducts" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('customers')">👤 مشتریان <span id="syncStatusCustomers" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('suppliers')">👥 تامین‌کنندگان <span id="syncStatusSuppliers" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('banks')">🏦 حساب‌های بانکی <span id="syncStatusBanks" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('units')">📊 واحدها و گروه‌ها <span id="syncStatusUnits" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('costs')">💰 سرفصل‌های هزینه <span id="syncStatusCosts" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                    <li><a class="dropdown-item" href="#" onclick="startSync('incomes')">📈 سرفصل‌های درآمد <span id="syncStatusIncomes" class="badge bg-secondary rounded-pill ms-auto">0</span></a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- محتوای اصلی -->
+<main class="container py-4">
+    {% block content %}{% endblock %}
+</main>
+
+<!-- ========== مودال سینک ========== -->
+<div class="modal fade sync-modal" id="syncModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <span id="syncModalIcon">🔄</span>
+                    <span id="syncModalTitleText">سینک اطلاعات</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="syncModalMessage" class="text-muted">در حال آماده‌سازی...</p>
+                <div class="progress mt-3 mb-4">
+                    <div id="syncModalProgress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;">0%</div>
+                </div>
+                <div id="syncModalDetails" class="mt-3"></div>
+                <div id="syncModalError" class="alert alert-danger mt-3" style="display:none;">
+                    <strong>❌ خطا:</strong> <span id="syncModalErrorText"></span>
+                </div>
+                <div class="text-center mt-4">
+                    <button class="btn btn-secondary" onclick="cancelSync()" id="syncCancelBtn">⛔ لغو عملیات</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- اسکریپت‌ها -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// =============================================
+// ✅ منطق کامل سینک (حفظ شده از نسخه قبلی)
+// =============================================
+let syncInterval = null;
+let currentSyncPart = '';
+let syncModal = null;
+
+function startSync(part) {
+    if (syncInterval) {
+        if (!confirm('عملیات سینک دیگری در حال اجراست. آیا می‌خواهید آن را متوقف کنید؟')) return;
+        cancelSync();
+    }
+    currentSyncPart = part;
+    if (!syncModal) syncModal = new bootstrap.Modal(document.getElementById('syncModal'));
+    syncModal.show();
+
+    const titles = {
+        'all': 'سینک همه اطلاعات', 'purchase': 'سینک اطلاعات فاکتور خرید',
+        'products': 'سینک کالاها', 'customers': 'سینک مشتریان',
+        'suppliers': 'سینک تامین‌کنندگان', 'banks': 'سینک حساب‌های بانکی',
+        'units': 'سینک واحدها و گروه‌ها', 'costs': 'سینک سرفصل‌های هزینه',
+        'incomes': 'سینک سرفصل‌های درآمد'
+    };
+    document.getElementById('syncModalTitleText').textContent = titles[part] || part;
+    document.getElementById('syncModalMessage').textContent = 'در حال اتصال به هلو...';
+    document.getElementById('syncModalProgress').style.width = '0%';
+    document.getElementById('syncModalProgress').textContent = '0%';
+    document.getElementById('syncModalDetails').innerHTML = '';
+    document.getElementById('syncModalError').style.display = 'none';
+
+    let url = (part === 'all') ? '/sync/all' : (part === 'purchase') ? '/sync/purchase/start' : `/sync/${part}`;
+    
+    $.post(url, function(response) {
+        if (response.status === 'started') {
+            if (syncInterval) clearInterval(syncInterval);
+            syncInterval = setInterval(() => checkSyncStatus(part), 1000);
+        } else {
+            showSyncError(response.message || 'خطا در شروع سینک');
+        }
+    }).fail(function(err) {
+        showSyncError(err.responseJSON?.message || 'خطا در ارتباط با سرور');
+    });
+}
+
+function checkSyncStatus(part) {
+    let url = (part === 'purchase') ? '/sync/purchase/check' : (part !== 'all') ? `/sync-status/${part}` : '/sync-status/all';
+    
+    $.get(url, function(data) {
+        let isSyncing = false, message = '', percent = 0;
+        
+        if (part === 'all') {
+            let totalParts = 0, completedParts = 0, messages = [];
+            for (const [key, value] of Object.entries(data)) {
+                if (key !== 'all') {
+                    totalParts++;
+                    if (value.is_syncing) { isSyncing = true; messages.push(`${key}: ${value.message}`); }
+                    if (value.current_stage === 'done') completedParts++;
+                }
+            }
+            percent = totalParts > 0 ? Math.round((completedParts / totalParts) * 100) : 0;
+            message = messages.join(' | ') || 'در حال سینک...';
+            if (!isSyncing && completedParts === totalParts) { message = '✅ سینک همه اطلاعات کامل شد!'; percent = 100; }
+        } else if (part === 'purchase') {
+            isSyncing = data.is_syncing || false;
+            message = data.message || '';
+            percent = data.progress_percent || 0;
+            renderPurchaseSyncDetails(data.details || {}, data.stage);
+        } else {
+            isSyncing = data.is_syncing || false;
+            message = data.message || '';
+            percent = (data.total > 0 && data.processed >= 0) ? Math.min(100, Math.round((data.processed / data.total) * 100)) : (isSyncing ? 50 : 100);
+        }
+
+        updateSyncModal(percent, message, isSyncing);
+        updateSyncIndicator(isSyncing);
+
+        if (!isSyncing && percent >= 100) {
+            clearInterval(syncInterval); syncInterval = null;
+            updateSyncCounters();
+            setTimeout(() => { if (syncModal) syncModal.hide(); }, 2000);
+        }
+    });
+}
+
+function updateSyncModal(percent, message, isSyncing) {
+    const bar = document.getElementById('syncModalProgress');
+    const msgEl = document.getElementById('syncModalMessage');
+    bar.style.width = percent + '%'; bar.textContent = percent + '%';
+    if (percent >= 100) { bar.className = 'progress-bar bg-success'; msgEl.innerHTML = '✅ ' + message; }
+    else if (isSyncing) { bar.className = 'progress-bar progress-bar-striped progress-bar-animated'; msgEl.textContent = message; }
+    else { bar.className = 'progress-bar'; msgEl.textContent = message; }
+}
+
+function renderPurchaseSyncDetails(details, stage) {
+    const container = document.getElementById('syncModalDetails');
+    if (!details || Object.keys(details).length === 0) { container.innerHTML = ''; return; }
+    const labels = { products:'کالاها', suppliers:'تامین‌کنندگان', banks:'بانک‌ها', costs:'هزینه‌ها', incomes:'درآمدها', units:'واحدها' };
+    let html = '<div class="sync-details-grid">';
+    for (const [key, value] of Object.entries(details)) {
+        if (labels[key]) {
+            const status = (value.total > 0 && value.processed >= value.total) ? 'text-success' : 'text-warning';
+            html += `<div class="d-flex justify-content-between small py-1 border-bottom"><span>${labels[key]}</span><span class="${status} fw-bold">${value.processed.toLocaleString()} / ${value.total.toLocaleString()}</span></div>`;
+        }
+    }
+    container.innerHTML = html + '</div>';
+}
+
+function updateSyncIndicator(isRunning) {
+    const ind = document.getElementById('syncStatusIndicator');
+    ind.className = 'sync-status-indicator ' + (isRunning ? 'running' : 'idle');
+}
+
+function updateSyncCounters() {
+    $.get('/api/pos/products/count', d => { if(d?.count) $('#syncStatusProducts').text(d.count.toLocaleString()).removeClass('bg-secondary').addClass('bg-success'); });
+    $.get('/api/pos/customers/count', d => { if(d?.count) $('#syncStatusCustomers').text(d.count.toLocaleString()).removeClass('bg-secondary').addClass('bg-success'); });
+    $.get('/api/suppliers/count', d => { if(d?.count) $('#syncStatusSuppliers').text(d.count.toLocaleString()).removeClass('bg-secondary').addClass('bg-success'); });
+    $.get('/api/bank-accounts/list', d => { if(d?.length) $('#syncStatusBanks').text(d.length.toLocaleString()).removeClass('bg-secondary').addClass('bg-success'); });
+    $.get('/api/meta/units', d => { if(d?.length) $('#syncStatusUnits').text(d.length.toLocaleString()).removeClass('bg-secondary').addClass('bg-success'); });
+}
+
+function showSyncError(message) {
+    document.getElementById('syncModalErrorText').textContent = message;
+    document.getElementById('syncModalError').style.display = 'block';
+    document.getElementById('syncModalMessage').textContent = '❌ عملیات با خطا مواجه شد';
+    if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+    updateSyncIndicator(false);
+}
+
+function cancelSync() {
+    if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+    if (currentSyncPart === 'purchase') $.post('/sync/purchase/cancel');
+    updateSyncIndicator(false);
+    if (syncModal) syncModal.hide();
+}
+
+$(document).ready(function() {
+    updateSyncCounters();
+    setInterval(updateSyncCounters, 30000);
+});
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>
